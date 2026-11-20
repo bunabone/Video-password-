@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>ניהול סרטונים</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- login -->
+  <main class="center" id="loginView">
+    <form class="card" id="loginForm">
+      <h1>כניסת מנהל</h1>
+      <label for="pw">סיסמת מנהל</label>
+      <input id="pw" type="password" autocomplete="current-password" required>
+      <button class="full" type="submit">כניסה</button>
+      <div class="error" id="loginErr" role="alert"></div>
+    </form>
+  </main>
+
+  <!-- dashboard -->
+  <div class="admin hidden" id="appView">
+    <div class="topbar">
+      <h1 style="margin:0">ניהול סרטונים וקודים</h1>
+      <button class="ghost small" id="logout">יציאה</button>
+    </div>
+
+    <div class="tabs">
+      <button class="active" data-tab="codes">קודי צפייה</button>
+      <button data-tab="videos">סרטונים והעלאה</button>
+    </div>
+
+    <!-- CODES -->
+    <section id="tab-codes">
+      <div class="panel">
+        <h2>יצירת קוד חדש</h2>
+        <form id="createForm">
+          <div class="grid">
+            <div>
+              <label for="names">שם הצופה (שורה לכל צופה = קוד לכל אחד)</label>
+              <textarea id="names" rows="3" placeholder="דנה כהן&#10;יוסי לוי" required></textarea>
+            </div>
+            <div>
+              <label for="video">סרטון</label>
+              <select id="video" required></select>
+              <label for="expires">בתוקף עד</label>
+              <input id="expires" type="datetime-local" required>
+            </div>
+            <div>
+              <label for="maxDevices">מספר מכשירים מותר לקוד</label>
+              <select id="maxDevices">
+                <option value="1" selected>מכשיר אחד (מומלץ)</option>
+                <option value="2">2 מכשירים</option>
+                <option value="3">3 מכשירים</option>
+                <option value="5">5 מכשירים</option>
+                <option value="0">ללא הגבלה</option>
+              </select>
+              <button class="full" type="submit">צור קוד</button>
+            </div>
+          </div>
+          <div class="error" id="createErr"></div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="topbar">
+          <h2 style="margin:0">קודים קיימים</h2>
+          <input id="filter" placeholder="חיפוש לפי שם / קוד" style="max-width:260px">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>צופה</th><th>קוד</th><th>סרטון</th><th>בתוקף עד</th><th>סטטוס</th><th>מכשירים</th><th>כניסות</th><th>פעולות</th></tr>
+            </thead>
+            <tbody id="codesBody"><tr><td colspan="8" class="muted">טוען…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIDEOS -->
+    <section id="tab-videos" class="hidden">
+      <div class="panel">
+        <h2>העלאת סרטון</h2>
+        <p class="muted small">
+          קודם מכינים את הסרטון במחשב עם הסקריפט <code class="k">prepare-video</code> (ראה README).
+          הסקריפט יוצר תיקייה עם קובץ <code class="k">index.m3u8</code>, קובץ <code class="k">enc.key</code> והרבה קבצי <code class="k">.ts</code>.
+          כאן בוחרים את התיקייה הזו ומעלים.
+        </p>
+        <div class="row">
+          <div>
+            <label for="vname">שם הסרטון באתר (אנגלית קטנה/ספרות/מקף)</label>
+            <input id="vname" placeholder="my-movie" dir="ltr">
+          </div>
+          <div>
+            <label for="folder">תיקיית הסרטון המוכנה</label>
+            <input id="folder" type="file" webkitdirectory multiple>
+          </div>
+          <button id="uploadBtn" type="button">העלאה</button>
+        </div>
+        <div class="progress hidden" id="prog"><div></div></div>
+        <div class="muted small" id="progText"></div>
+        <div class="error" id="uploadErr"></div>
+      </div>
+
+      <div class="panel">
+        <h2>סרטונים באתר</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>שם</th><th>מצב</th><th>הועלה</th><th>פעולות</th></tr></thead>
+            <tbody id="videosBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="/admin.js"></script>
+</body>
+</html>

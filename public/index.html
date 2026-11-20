@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>צפייה בסרטון</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="center">
+    <form class="card" id="form" autocomplete="off">
+      <h1>צפייה בסרטון</h1>
+      <p class="muted">הזן את קוד הצפייה האישי שקיבלת.</p>
+      <label for="code">קוד צפייה</label>
+      <input id="code" class="code-input" maxlength="9" placeholder="XXXX-XXXX" inputmode="text" autocapitalize="characters" spellcheck="false" required>
+      <button class="full" id="btn" type="submit">כניסה</button>
+      <div class="error" id="err" role="alert"></div>
+    </form>
+  </main>
+  <script>
+    const input = document.getElementById("code");
+    const err = document.getElementById("err");
+    const btn = document.getElementById("btn");
+
+    // Already logged in? go straight to the player.
+    fetch("/api/me").then(r => { if (r.ok) location.replace("/watch"); });
+
+    input.addEventListener("input", () => {
+      let v = input.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+      if (v.length > 4) v = v.slice(0, 4) + "-" + v.slice(4);
+      input.value = v;
+    });
+
+    document.getElementById("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      err.textContent = "";
+      btn.disabled = true;
+      try {
+        const r = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: input.value }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || "שגיאה");
+        location.replace("/watch");
+      } catch (ex) {
+        err.textContent = ex.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

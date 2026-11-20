@@ -1,0 +1,24 @@
+name = "video-vault"
+main = "src/worker.js"
+compatibility_date = "2026-11-01"
+
+# Static pages (login screen, player, admin panel)
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*", "/v/*"]
+
+# Where the video files live (Cloudflare R2, free up to 10GB)
+[[r2_buckets]]
+binding = "VIDEOS"
+bucket_name = "video-vault"
+
+# Where the viewer codes live (Cloudflare KV)
+# Replace the id with the one you get from: npx wrangler kv namespace create CODES
+[[kv_namespaces]]
+binding = "CODES"
+id = "REPLACE_WITH_YOUR_KV_ID"
+
+[vars]
+# How long a viewer stays logged in before re-entering the code (hours)
+SESSION_HOURS = "12"
