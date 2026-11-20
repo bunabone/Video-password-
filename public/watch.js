@@ -52,6 +52,44 @@
     showError("הדפדפן לא תומך בניגון. נסה Chrome, Edge, Firefox או Safari מעודכן.");
   }
 
+  // ----- viewing log: count seconds actually played (seeking doesn't count)
+  let viewId = null, starting = false, pending = 0, lastT = null;
+  const dur = () => (Number.isFinite(video.duration) ? video.duration : null);
+  video.addEventListener("playing", async () => {
+    lastT = video.currentTime;
+    if (viewId || starting) return;
+    starting = true;
+    try {
+      const r = await fetch("/api/view/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ duration: dur() }),
+      });
+      if (r.ok) viewId = (await r.json()).id;
+    } catch {}
+  });
+  video.addEventListener("timeupdate", () => {
+    const t = video.currentTime;
+    if (lastT !== null && !video.paused && !video.seeking) {
+      const d = t - lastT;
+      if (d > 0 && d < 2) pending += d / (video.playbackRate || 1);
+    }
+    lastT = t;
+  });
+  video.addEventListener("seeking", () => (lastT = null));
+  function ping(beacon) {
+    if (!viewId || (pending < 0.5 && !beacon)) return;
+    const body = JSON.stringify({ id: viewId, watched: Math.round(pending), position: Math.round(video.currentTime), duration: dur() });
+    pending -= Math.round(pending);
+    if (beacon && navigator.sendBeacon) navigator.sendBeacon("/api/view/ping", new Blob([body], { type: "application/json" }));
+    else fetch("/api/view/ping", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => {});
+  }
+  setInterval(() => ping(false), 30000);
+  video.addEventListener("pause", () => ping(false));
+  video.addEventListener("ended", () => ping(false));
+  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && ping(true));
+  window.addEventListener("pagehide", () => ping(true));
+
   // ----- fullscreen on the wrapper (so the watermark stays visible)
   const fsBtn = document.getElementById("fs");
   fsBtn.addEventListener("click", async () => {
@@ -83,6 +121,7 @@
   }, 5 * 60 * 1000);
 
   document.getElementById("logout").addEventListener("click", async () => {
+    ping(false);
     await fetch("/api/logout", { method: "POST" });
     location.replace("/");
   });

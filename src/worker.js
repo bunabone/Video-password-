@@ -44,6 +44,9 @@ async function route(request, env) {
     return json({ ok: true }, 200, { "Set-Cookie": clearCookie("sess") });
   }
 
+  if (p === "/api/view/start" && m === "POST") return viewStart(request, env);
+  if (p === "/api/view/ping" && m === "POST") return viewPing(request, env);
+
   const v = p.match(/^\/v\/([^/]+)\/([^/]+)$/);
   if (v && (m === "GET" || m === "HEAD")) return serveVideoFile(request, env, v[1], v[2]);
 
@@ -157,6 +160,102 @@ async function serveVideoFile(request, env, video, file) {
   });
 }
 
+// ---------------------------------------------------------------- viewing log (D1)
+// One row per viewing session. The player calls /start on first play and
+// /ping every ~30s with the seconds actually played since the last ping.
+
+let schemaReady = false;
+async function getDb(env) {
+  if (!env.DB) return null;
+  if (!schemaReady) {
+    await env.DB.batch([
+      env.DB.prepare(`CREATE TABLE IF NOT EXISTS views (
+        id TEXT PRIMARY KEY,
+        code TEXT NOT NULL,
+        name TEXT,
+        video TEXT,
+        started_at INTEGER NOT NULL,
+        last_seen INTEGER NOT NULL,
+        watched REAL NOT NULL DEFAULT 0,
+        max_pos REAL NOT NULL DEFAULT 0,
+        duration REAL,
+        ip TEXT,
+        country TEXT,
+        city TEXT,
+        ua TEXT
+      )`),
+      env.DB.prepare("CREATE INDEX IF NOT EXISTS views_started ON views(started_at)"),
+      env.DB.prepare("CREATE INDEX IF NOT EXISTS views_code ON views(code, started_at)"),
+    ]);
+    schemaReady = true;
+  }
+  return env.DB;
+}
+
+const num = (x, max) => {
+  const n = Number(x);
+  return Number.isFinite(n) && n >= 0 ? Math.min(n, max) : 0;
+};
+
+async function viewStart(request, env) {
+  const s = await viewerSession(request, env, true);
+  const db = await getDb(env);
+  if (!db) return json({ id: null });
+  const b = await readJson(request);
+  const id = randomHex(12);
+  const now = Date.now();
+  const cf = request.cf || {};
+  await db
+    .prepare(
+      `INSERT INTO views (id, code, name, video, started_at, last_seen, duration, ip, country, city, ua)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      id, s.code, s.rec.name, s.video, now, now,
+      num(b.duration, 864000) || null,
+      request.headers.get("CF-Connecting-IP") || null,
+      cf.country || null,
+      cf.city || null,
+      (request.headers.get("User-Agent") || "").slice(0, 300)
+    )
+    .run();
+  return json({ id });
+}
+
+async function viewPing(request, env) {
+  const s = await viewerSession(request, env, false);
+  const db = await getDb(env);
+  if (!db) return json({ ok: true });
+  const b = await readJson(request);
+  if (!/^[a-f0-9]{24}$/.test(String(b.id || ""))) throw new HttpError(400, "בקשה לא תקינה");
+  await db
+    .prepare(
+      `UPDATE views SET last_seen = ?, watched = watched + ?, max_pos = MAX(max_pos, ?),
+         duration = COALESCE(?, duration)
+       WHERE id = ? AND code = ?`
+    )
+    .bind(Date.now(), num(b.watched, 90), num(b.position, 864000), num(b.duration, 864000) || null, b.id, s.code)
+    .run();
+  return json({ ok: true });
+}
+
+async function listViews(request, env) {
+  const db = await getDb(env);
+  if (!db) return json({ views: [], disabled: true });
+  const url = new URL(request.url);
+  const where = [], args = [];
+  const code = normalizeCode(url.searchParams.get("code"));
+  if (code) where.push("code = ?"), args.push(code);
+  const video = url.searchParams.get("video");
+  if (video && VIDEO_RE.test(video)) where.push("video = ?"), args.push(video);
+  const limit = Math.min(2000, parseInt(url.searchParams.get("limit") || "1000", 10) || 1000);
+  const sql =
+    "SELECT * FROM views" + (where.length ? " WHERE " + where.join(" AND ") : "") +
+    " ORDER BY started_at DESC LIMIT " + limit;
+  const { results } = await db.prepare(sql).bind(...args).all();
+  return json({ views: results });
+}
+
 // ---------------------------------------------------------------- admin
 
 async function adminRoute(request, env, sub, m) {
@@ -197,6 +296,7 @@ async function adminRoute(request, env, sub, m) {
     return json({ ok: true });
   }
 
+  if (sub === "views" && m === "GET") return listViews(request, env);
   if (sub === "videos" && m === "GET") return listVideos(env);
   mm = sub.match(/^videos\/([^/]+)$/);
   if (mm && m === "DELETE") return deleteVideo(env, mm[1]);

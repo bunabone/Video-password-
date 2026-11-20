@@ -143,6 +143,12 @@ td.code { font-family: ui-monospace, Consolas, monospace; direction: ltr; text-a
 .row { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
 .row > * { flex: 1 1 200px; }
 .row > button { flex: 0 0 auto; }
+.stats { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.stats > div { background: var(--panel-2); border-radius: 8px; padding: 10px 16px; min-width: 120px; }
+.stats b { display: block; font-size: 1.4rem; }
+.stats span { color: var(--muted); font-size: .85rem; }
+.bar { display: inline-block; width: 60px; height: 6px; background: var(--panel-2); border-radius: 999px; overflow: hidden; vertical-align: middle; }
+.bar > i { display: block; height: 100%; background: var(--ok); }
 code.k { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; }
 .toast {
   position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);

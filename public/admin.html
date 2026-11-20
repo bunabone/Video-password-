@@ -28,8 +28,39 @@
 
     <div class="tabs">
       <button class="active" data-tab="codes">קודי צפייה</button>
+      <button data-tab="views">רשימת צפיות</button>
       <button data-tab="videos">סרטונים והעלאה</button>
     </div>
+
+    <!-- VIEWS -->
+    <section id="tab-views" class="hidden">
+      <div class="panel">
+        <div class="row">
+          <div>
+            <label for="vfText">חיפוש לפי שם / קוד</label>
+            <input id="vfText" placeholder="לדוגמה: דנה">
+          </div>
+          <div>
+            <label for="vfVideo">סרטון</label>
+            <select id="vfVideo"><option value="">כל הסרטונים</option></select>
+          </div>
+          <button class="ghost" id="vRefresh" type="button">רענון</button>
+          <button class="ghost" id="vCsv" type="button">ייצוא ל-Excel</button>
+        </div>
+        <div class="stats" id="vStats"></div>
+      </div>
+      <div class="panel">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>צופה</th><th>קוד</th><th>סרטון</th><th>התחיל לצפות</th><th>פעילות אחרונה</th><th>זמן צפייה</th><th>הגיע עד</th><th>מכשיר</th><th>מיקום</th></tr>
+            </thead>
+            <tbody id="viewsBody"><tr><td colspan="9" class="muted">טוען…</td></tr></tbody>
+          </table>
+        </div>
+        <p class="muted small">"זמן צפייה" = זמן ניגון בפועל (דילוגים לא נספרים). "הגיע עד" = הנקודה הרחוקה ביותר בסרטון. שורה חדשה נוצרת בכל פעם שהצופה פותח את הנגן ולוחץ Play.</p>
+      </div>
+    </section>
 
     <!-- CODES -->
     <section id="tab-codes">

@@ -19,6 +19,13 @@ bucket_name = "video-vault"
 binding = "CODES"
 id = "REPLACE_WITH_YOUR_KV_ID"
 
+# Viewing log (who watched, when, how much) — Cloudflare D1, free tier
+# Replace the id with the one you get from: npx wrangler d1 create video-vault
+[[d1_databases]]
+binding = "DB"
+database_name = "video-vault"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+
 [vars]
 # How long a viewer stays logged in before re-entering the code (hours)
 SESSION_HOURS = "12"

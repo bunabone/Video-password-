@@ -58,17 +58,105 @@ $("logout").addEventListener("click", async () => {
 });
 
 // ---------------- tabs
-document.querySelectorAll(".tabs button").forEach((b) =>
-  b.addEventListener("click", () => {
-    document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("active", x === b));
-    $("tab-codes").classList.toggle("hidden", b.dataset.tab !== "codes");
-    $("tab-videos").classList.toggle("hidden", b.dataset.tab !== "videos");
-  })
-);
+function showTab(name) {
+  document.querySelectorAll(".tabs button").forEach((x) => {
+    x.classList.toggle("active", x.dataset.tab === name);
+    $("tab-" + x.dataset.tab).classList.toggle("hidden", x.dataset.tab !== name);
+  });
+  if (name === "views") loadViews();
+}
+document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
 async function refreshAll() {
   await Promise.all([loadVideos(), loadCodes()]);
 }
+
+// ---------------- views log
+let views = [];
+async function loadViews() {
+  try {
+    const res = await api("views");
+    views = res.views;
+    if (res.disabled) {
+      $("viewsBody").innerHTML =
+        '<tr><td colspan="9" class="error">רשימת הצפיות לא מופעלת: חסר מסד D1 בהגדרות (ראה README, שלב 3).</td></tr>';
+      return;
+    }
+    renderViews();
+  } catch (ex) {
+    $("viewsBody").innerHTML = `<tr><td colspan="9" class="error">${esc(ex.message)}</td></tr>`;
+  }
+}
+
+function dur(sec) {
+  sec = Math.round(sec || 0);
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+}
+function device(ua = "") {
+  const os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android"
+    : /Windows/.test(ua) ? "Windows" : /Mac OS X|Macintosh/.test(ua) ? "Mac" : /Linux/.test(ua) ? "Linux" : "?";
+  const br = /Edg\//.test(ua) ? "Edge" : /SamsungBrowser/.test(ua) ? "Samsung" : /Firefox|FxiOS/.test(ua) ? "Firefox"
+    : /Chrome|CriOS/.test(ua) ? "Chrome" : /Safari/.test(ua) ? "Safari" : "";
+  return br ? `${os} · ${br}` : os;
+}
+function pct(v) {
+  return v.duration ? Math.min(100, Math.round((v.max_pos / v.duration) * 100)) : null;
+}
+function filteredViews() {
+  const q = $("vfText").value.trim().toLowerCase();
+  const vid = $("vfVideo").value;
+  return views.filter(
+    (v) => (!vid || v.video === vid) && (!q || (v.name || "").toLowerCase().includes(q) || v.code.toLowerCase().includes(q))
+  );
+}
+
+function renderViews() {
+  const rows = filteredViews();
+  const people = new Set(rows.map((v) => v.code)).size;
+  const total = rows.reduce((s, v) => s + (v.watched || 0), 0);
+  $("vStats").innerHTML =
+    `<div><b>${rows.length}</b><span>צפיות</span></div>` +
+    `<div><b>${people}</b><span>צופים שונים</span></div>` +
+    `<div><b>${dur(total)}</b><span>סה"כ זמן צפייה</span></div>`;
+  if (!rows.length) {
+    $("viewsBody").innerHTML = '<tr><td colspan="9" class="muted">אין צפיות עדיין</td></tr>';
+    return;
+  }
+  $("viewsBody").innerHTML = rows
+    .map((v) => {
+      const p = pct(v);
+      const place = [v.city, v.country].filter(Boolean).join(", ") || "—";
+      return `<tr>
+        <td>${esc(v.name)}</td>
+        <td class="code">${esc(v.code)}</td>
+        <td>${esc(v.video)}</td>
+        <td>${fmt(v.started_at)}</td>
+        <td>${fmt(v.last_seen)}</td>
+        <td>${dur(v.watched)}</td>
+        <td>${p === null ? dur(v.max_pos) : `<span class="bar"><i style="width:${p}%"></i></span> ${p}%`}</td>
+        <td title="${esc(v.ua)}">${esc(device(v.ua))}</td>
+        <td title="IP: ${esc(v.ip || "")}">${esc(place)}</td>
+      </tr>`;
+    })
+    .join("");
+}
+$("vfText").addEventListener("input", renderViews);
+$("vfVideo").addEventListener("change", renderViews);
+$("vRefresh").addEventListener("click", loadViews);
+$("vCsv").addEventListener("click", () => {
+  const head = ["צופה", "קוד", "סרטון", "התחלה", "פעילות אחרונה", "זמן צפייה (דקות)", "הגיע עד (%)", "מכשיר", "עיר", "מדינה", "IP"];
+  const lines = filteredViews().map((v) => [
+    v.name, v.code, v.video, fmt(v.started_at), fmt(v.last_seen), ((v.watched || 0) / 60).toFixed(1),
+    pct(v) ?? "", device(v.ua), v.city || "", v.country || "", v.ip || "",
+  ]);
+  const csv = [head, ...lines].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
+  a.download = "views-" + new Date().toISOString().slice(0, 10) + ".csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
 
 // ---------------- codes
 async function loadCodes() {
@@ -105,6 +193,7 @@ function renderCodes() {
       <td title="כניסה אחרונה: ${esc(fmt(c.lastUsed))}">${c.uses}</td>
       <td class="actions">
         <button class="ghost small" data-act="copy">העתק הודעה</button>
+        <button class="ghost small" data-act="views">צפיות</button>
         <button class="ghost small" data-act="extend">שנה תוקף</button>
         <button class="ghost small" data-act="reset" title="מאפשר לצופה להיכנס ממכשיר חדש">אפס מכשירים</button>
         <button class="danger small" data-act="${c.revoked ? "restore" : "revoke"}">${c.revoked ? "שחזר" : "בטל"}</button>
@@ -132,6 +221,11 @@ $("codesBody").addEventListener("click", async (e) => {
         toast("ההודעה הועתקה");
         return;
       }
+      case "views":
+        $("vfText").value = c.code;
+        $("vfVideo").value = "";
+        showTab("views");
+        return;
       case "extend": {
         const cur = toLocalInput(new Date(c.expires)).replace("T", " ");
         const v = prompt("תאריך ושעת תפוגה חדשים (YYYY-MM-DD HH:MM):", cur);
@@ -199,6 +293,9 @@ async function loadVideos() {
     ? videos.map((v) => `<option value="${esc(v.name)}">${esc(v.name)}${v.ready ? "" : " (לא מוכן)"}</option>`).join("")
     : '<option value="">— קודם יש להעלות סרטון —</option>';
   if (prev) sel.value = prev;
+  const vf = $("vfVideo"), vprev = vf.value;
+  vf.innerHTML = '<option value="">כל הסרטונים</option>' + videos.map((v) => `<option value="${esc(v.name)}">${esc(v.name)}</option>`).join("");
+  vf.value = vprev;
 
   $("videosBody").innerHTML = videos.length
     ? videos
